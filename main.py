@@ -24,7 +24,11 @@ URLS_FILE = "urls.txt"
 # (Doit être configuré en tant que "Secret" dans GitHub Actions pour la sécurité)
 DISCORD_WEBHOOK_OKKAZEO = os.environ.get("DISCORD_WEBHOOK_OKKAZEO") 
 
-RUN_DURATION = 1 * 3600 + 50 * 60  # 1 * 3600 + 50 * 60 Durée du run en secondes (1h50)
+# Durée du run en secondes (5 heures et 50 minutes)
+# 5 heures * 3600 secondes/heure = 18000 secondes
+# 50 minutes * 60 secondes/minute = 3000 secondes
+# Total : 18000 + 3000 = 21000 secondes
+RUN_DURATION = 5 * 3600 + 50 * 60  # 21000 secondes, soit 5h50
 
 
 # ----------------------
