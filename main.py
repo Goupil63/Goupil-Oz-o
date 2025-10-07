@@ -68,31 +68,29 @@ def save_seen_items(filename, items_set):
 # 5. DISCORD
 # ----------------------
 
-    message = {"content": message_content}
-    try:
-        requests.post(status_webhook_url, json=message, timeout=10)
-        logger.info("Message de statut envoyé avec succès.")
-    except Exception as e:
-        logger.error(f"Erreur lors de l'envoi du message de statut : {e}")
-
-
-
-def send_to_discord(title, price, link, img_url=""):
+def send_to_discord(title, price, link, seller_location, img_url=""):
     if not title or not link:
         logger.warning("Titre ou lien vide, notification Discord ignorée")
         return
-    data = {
-        "embeds": [{
-            "title": f"{title} - {price}",
-            "url": link,
-            "color": 3447003,
-            "image": {"url": img_url} if img_url else None
-        }]
+
+    embed = {
+        "title": f"{title} - {price}",
+        "url": link,
+        "description": seller_location,
+        "color": 3447003
     }
+
+    if img_url:
+        embed["image"] = {"url": img_url}
+
+    data = {"embeds": [embed]}
+
     try:
         resp = session.post(WEBHOOK_DISCORD_OKKAZEO, json=data, timeout=10)
         if resp.status_code // 100 != 2:
-            logger.warning(f"Discord Webhook renvoyé {resp.status_code}")
+            logger.warning(f"Discord Webhook a renvoyé {resp.status_code} : {resp.text}")
+        else:
+            logger.info(f"✅ Notification envoyée à Discord : {title}")
     except Exception as e:
         logger.error(f"Erreur en envoyant à Discord : {e}")
 
@@ -196,16 +194,16 @@ def main():
 
     # 4. Traiter et alerter les nouvelles annonces
     if new_announcements:
-        logger.info(f"!!! {len(new_announcements)} NOUVELLE(S) ANNONCE(S) DÉTECTÉE(S) !!!")
+        logger.info(f"🚨 {len(new_announcements)} nouvelle(s) annonce(s) détectée(s) !")
         for item in new_announcements:
-            # ❌ CORRECTION : Appel avec les nouvelles clés et la bonne fonction
             send_to_discord(
-                item['title'], 
-                item['price'], 
-                item['url'], 
+                item['title'],
+                item['price'],
+                item['url'],
                 item['seller_location'],
                 item['img_url']
             )
+            
     else:
         logger.info("Aucune nouvelle annonce détectée.")
 
@@ -213,9 +211,6 @@ def main():
     save_seen_items(SEEN_FILE, new_ids)
     logger.info("Fichier de mémoire mis à jour.")
     logger.info("--- Surveillance terminée ---")
-
-if __name__ == "__main__":
-    main()
 
 if __name__ == "__main__":
     main()
