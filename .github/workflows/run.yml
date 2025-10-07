@@ -7,7 +7,11 @@ on:
 jobs:
   scrape_and_alert:
     runs-on: ubuntu-latest
-
+    
+    # AJOUTEZ CE BLOC DE PERMISSIONS :
+    permissions:
+      contents: write # Nécessaire pour l'action de commit (git-auto-commit-action)
+      
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -23,14 +27,13 @@ jobs:
         pip install -r requirements.txt
         
     - name: Run Scraper
-      # Passage du Secret à la variable d'environnement du script
+      # Le secret est passé ici
       env:
-        WEBHOOK_DISCORD_OKKAZEO: ${{ secrets.WEBHOOK_DISCORD_OKKAZEO }}
+        WEBHOOK_DISCORD_OKKAZEO: ${{ secrets.WEBHOOK_DISCORD_OKKAZEOS }} # Double-vérifiez l'orthographe !
       run: |
         python main.py
         
     - name: Commit seen.json changes
-      # Correction ici : Utilisation de file_pattern
       uses: stefanzweifel/git-auto-commit-action@v5
       with:
         file_pattern: seen.json
