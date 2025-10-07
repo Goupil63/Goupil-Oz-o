@@ -17,6 +17,7 @@ SEEN_FILE = "seen.json"
 
 # Récupération de l'URL du Webhook Discord depuis les variables d'environnement
 # (Doit être configuré en tant que "Secret" dans GitHub Actions pour la sécurité)
+env :
 WEBHOOK_DISCORD_OKKAZEO = os.environ.get("WEBHOOK_DISCORD_OKKAZEO") 
 
 
