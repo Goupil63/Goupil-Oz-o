@@ -37,7 +37,7 @@ def fetch_and_parse(url):
     """Récupère la page et extrait les informations des annonces."""
     try:
         response = requests.get(url)
-        response.raise_for_status() # Lève une exception pour les erreurs HTTP
+        response.raise_for_status()
     except requests.exceptions.RequestException as e:
         print(f"Erreur de requête HTTP : {e}")
         return []
@@ -45,32 +45,59 @@ def fetch_and_parse(url):
     soup = BeautifulSoup(response.text, 'html.parser')
     announcements = []
 
-    # Le sélecteur clé ici est la classe CSS qui englobe chaque annonce.
-    # Dans l'exemple d'Okkazeo, les annonces sont souvent dans des divs avec des classes spécifiques.
-    # ATTENTION : Ce sélecteur ('div.divannonce') est un exemple et DOIT être ajusté 
-    # en fonction de la structure HTML actuelle de la page.
-    for element in soup.select('div.divannonce'):
-        # Tente d'extraire un ID unique pour l'annonce. C'est CRUCIAL.
-        # Un bon ID pourrait être l'attribut 'id' du div ou un lien vers l'annonce.
-        # Ici, on utilise l'URL complète comme ID pour simplifier, 
-        # mais idéalement, on chercherait l'ID numérique interne de l'annonce.
-        link_tag = element.find('a', href=True)
-        if not link_tag:
-             continue # Saute si pas de lien trouvé
-
-        # Construction des données de l'annonce
-        item_id = link_tag['href'] # Utilisons le lien comme identifiant unique
-        title = element.find('h4').text.strip() if element.find('h4') else "Titre non trouvé"
+    # Le sélecteur cible désormais la DIV principale de chaque annonce
+    # qui porte la classe 'grid-x box_article'.
+    for element in soup.select('div.box_article'):
         
-        # Exemple d'extraction du prix (à ajuster)
-        price_tag = element.find('div', class_='price')
-        price = price_tag.text.strip() if price_tag else "Prix non spécifié"
+        # --- 1. Extraction de l'ID et du lien (CRUCIAL) ---
+        # Le lien <a> englobant est le premier enfant du div.box_article
+        link_tag = element.select_one('a')
+        if not link_tag or 'href' not in link_tag.attrs:
+             continue 
 
+        item_path = link_tag['href']  # Ex: /annonces/1307762/...
+        
+        # On extrait l'ID numérique pour le seen.json
+        try:
+             # Cible le numéro au milieu de l'URL (ex: 1307762)
+             item_id = item_path.split('/')[2]
+        except IndexError:
+             # Si le format de l'URL est inattendu, on saute
+             continue
+
+        # --- 2. Extraction du Prix ---
+        # Le prix est dans la balise span.prix (dans la div 'show-for-medium')
+        # On vérifie dans la div 'show-for-medium' car elle est la plus fiable
+        price_tag_medium = element.select_one('.show-for-medium span.prix')
+        price = price_tag_medium.text.strip() if price_tag_medium else "Prix non spécifié"
+        
+        # --- 3. Extraction du Vendeur ---
+        # On cherche le lien dont le titre commence par "Voir le profil"
+        seller_tag = element.select_one('a[title^="Voir le profil"]')
+        seller_name = seller_tag.text.strip() if seller_tag else "Vendeur non spécifié"
+        
+        # --- 4. Extraction du Lieu ---
+        # On cherche l'élément qui contient l'icône de localisation
+        location_element = element.find('i', class_='fa-map-marker-alt')
+        location = "Lieu non spécifié"
+        if location_element:
+             # On remonte au parent (div) et on cherche la balise texte après l'image du drapeau
+             parent_div = location_element.parent
+             # Le texte du lieu est juste après le drapeau (ou avant la balise <br>)
+             if parent_div.text:
+                 # Extraction du texte du lieu (ex: Paris (75015))
+                 # On prend le texte de la div, puis on retire le texte du vendeur/évaluation
+                 location = parent_div.text.split(')')[-2].split('(')[0].strip() + parent_div.text.split(')')[-2].split('(')[1].strip()
+                 # Une méthode plus simple : trouver le nœud de texte après le drapeau
+                 # location_text_node = parent_div.find('img', class_='drapeau').next_sibling
+                 # location = location_text_node.strip() if location_text_node else "Lieu non spécifié"
+
+        
         announcements.append({
             'id': item_id,
-            'title': title,
+            'title': f"Annonce par {seller_name} ({location})",
             'price': price,
-            'url': f"https://www.okkazeo.com{item_id}" # Reconstituer l'URL complète
+            'url': f"https://www.okkazeo.com{item_path}" 
         })
     
     return announcements
