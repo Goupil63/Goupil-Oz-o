@@ -8,6 +8,9 @@ jobs:
   scrape_and_alert:
     runs-on: ubuntu-latest
     
+    env:
+      WEBHOOK_DISCORD_OKKAZEO: ${{ secrets.WEBHOOK_DISCORD_OKKAZEO }}
+    
     # AJOUTEZ CE BLOC DE PERMISSIONS :
     permissions:
       contents: write # Nécessaire pour l'action de commit (git-auto-commit-action)
