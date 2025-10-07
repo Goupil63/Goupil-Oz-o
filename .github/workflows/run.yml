@@ -1,0 +1,35 @@
+name: Okkazeo Scraper Alert
+
+jobs:
+  scrape_and_alert:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run Scraper
+      # Passage du Secret à la variable d'environnement du script
+      env:
+        WEBHOOK_DISCORD_OKKAZEO: ${{ secrets.WEBHOOK_DISCORD_OKKAZEO }}
+      run: |
+        python main.py
+        
+    - name: Commit seen.json changes
+      # Cette étape est cruciale pour sauvegarder la mémoire du scrapping (seen.json)
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        # Ne committe que le fichier de mémoire
+        files: seen.json
+        commit_message: 'MAJ automatique: Ajout des dernières annonces vues'
+        branch: main # ou master, selon votre branche principale
