@@ -1,9 +1,9 @@
 name: Okkazeo Scraper Alert
 
 on:
-  # Permet le lancement manuel via l'interface GitHub (bouton "Run workflow")
+  # Permet le lancement manuel via l'interface GitHub
   workflow_dispatch:
-  
+
 jobs:
   scrape_and_alert:
     runs-on: ubuntu-latest
@@ -28,12 +28,11 @@ jobs:
         WEBHOOK_DISCORD_OKKAZEO: ${{ secrets.WEBHOOK_DISCORD_OKKAZEO }}
       run: |
         python main.py
-
-     - name: Commit seen.json changes
+        
+    - name: Commit seen.json changes
+      # Correction ici : Utilisation de file_pattern
       uses: stefanzweifel/git-auto-commit-action@v5
       with:
-        # ✅ Utiliser 'file_pattern' (ou 'file_patterns' si plusieurs fichiers)
         file_pattern: seen.json
         commit_message: 'MAJ manuelle: Ajout des dernières annonces vues'
-        branch: main # ou master, selon votre branche principale   
-        
+        branch: main
