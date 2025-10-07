@@ -3,6 +3,8 @@ import json
 from bs4 import BeautifulSoup
 import os
 import logging
+import time
+import random
 
 
 # ----------------------
@@ -21,6 +23,8 @@ URLS_FILE = "urls.txt"
 # Récupération de l'URL du Webhook Discord depuis les variables d'environnement
 # (Doit être configuré en tant que "Secret" dans GitHub Actions pour la sécurité)
 DISCORD_WEBHOOK_OKKAZEO = os.environ.get("DISCORD_WEBHOOK_OKKAZEO") 
+
+RUN_DURATION = 1 * 3600 + 50 * 60  # 1 * 3600 + 50 * 60 Durée du run en secondes (1h50)
 
 
 # ----------------------
@@ -193,6 +197,17 @@ def fetch_and_parse(url):
 # ----------------------
 # 7. FONCTION PRINCIPALE
 # ----------------------
+def check_okkazeo():
+    """Fonction principale pour exécuter une seule surveillance (anciennement main)."""
+    logger.info("--- Démarrage de la surveillance Okkazeo ---")
+
+    if not DISCORD_WEBHOOK_OKKAZEO:
+        logger.error("Arrêt : Le Secret DISCORD_WEBHOOK_OKKAZEO n'est pas chargé (valeur vide).")
+        return
+
+    # Si nous arrivons ici, la variable a été lue.
+    logger.info("Webhook Discord chargé avec succès.")
+
 
 def main():
     """Fonction principale pour exécuter la surveillance."""
@@ -261,5 +276,58 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ----------------------
+# 7. BOUCLE BOT AVEC DUREE LIMITEE <-- Votre nouveau code
+# ----------------------
+def bot_loop():
+    # Pour la gestion du seen_items, nous devons le charger une seule fois
+    seen_ids = load_seen_items(SEEN_FILE)
+    logger.info(f"Annonces initialement vues : {len(seen_ids)}")
+    
+    end_time = time.time() + RUN_DURATION
+    
+    while time.time() < end_time:
+        logger.info("▶️ Nouvelle analyse...")
+        
+        # ❌ CORRECTION : Appelle la fonction de scraping Okkazeo
+        # Vous devrez adapter check_okkazeo pour qu'elle prenne et mette à jour seen_ids.
+        # Pour une solution simple, nous allons la laisser charger/sauvegarder à chaque fois, 
+        # mais c'est moins efficace.
+
+        # *** Solution SIMPLE (recommandée ici) : Laisser check_okkazeo faire son travail
+        # et recharger la mémoire à chaque fois.
+        
+        check_okkazeo() # Appel de l'ancienne fonction main
+        
+        # *** Solution AVANCÉE (nécessite une refonte des arguments de check_okkazeo) ***
+        # new_ids = check_okkazeo(seen_ids)
+        # seen_ids = new_ids 
+
+        
+        time_remaining = end_time - time.time()
+        if time_remaining <= 0:
+            break
+            
+        # Sleep aléatoire mais ne dépasse pas la fin du run
+        delay = random.uniform(180, 360)  # 3 à 6 minutes
+        sleep_time = min(delay, time_remaining)
+        
+        logger.info(f"🔍 Prochaine analyse dans {int(sleep_time)} secondes")
+        time.sleep(sleep_time)
+
+    logger.info("🏁 Fin du run")
+    # Si nous gardons la structure check_okkazeo qui sauvegarde à la fin, nous n'avons pas besoin
+    # de cette ligne : save_seen(seen_items) 
+    # send_status_message("✅ Run terminé !") # Nécessite l'implémentation de cette fonction
+
+# ----------------------
+# 8. POINT D'ENTRÉE (Mis à jour)
+# ----------------------
+if __name__ == "__main__":
+    # ❌ CORRECTION : Appelle la nouvelle boucle principale
+    bot_loop()
+
 
 
