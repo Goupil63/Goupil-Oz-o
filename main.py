@@ -75,7 +75,17 @@ def save_seen_items(filename, items_set):
 def read_urls(filename):
     """Lit une liste d'URLs depuis un fichier."""
     urls = []
-    # ... le reste du code de la fonction ...
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            for line in f:
+                url = line.strip()
+                # Ignore les lignes vides ou de commentaires
+                if url and not url.startswith('#'):
+                    urls.append(url)
+        # Ajout d'un log pour confirmer la lecture
+        logger.info(f"Fichier URLs lu : {len(urls)} URLs trouvées.")
+    except FileNotFoundError:
+        logger.error(f"Le fichier {filename} est introuvable. Veuillez le créer à la racine du dépôt.")
     return urls
 
 # ----------------------
