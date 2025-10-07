@@ -17,7 +17,7 @@ SEEN_FILE = "seen.json"
 
 # Récupération de l'URL du Webhook Discord depuis les variables d'environnement
 # (Doit être configuré en tant que "Secret" dans GitHub Actions pour la sécurité)
-WEBHOOK_DISCORD_OKKAZEO = os.environ.get("WEBHOOK_DISCORD_OKKAZEO") 
+DISCORD_WEBHOOK_OKKAZEO = os.environ.get("DISCORD_WEBHOOK_OKKAZEO") 
 
 
 # ----------------------
@@ -87,7 +87,7 @@ def send_to_discord(title, price, link, seller_location, img_url=""):
     data = {"embeds": [embed]}
 
     try:
-        resp = session.post(WEBHOOK_DISCORD_OKKAZEO, json=data, timeout=10)
+        resp = session.post(DISCORD_WEBHOOK_OKKAZEO, json=data, timeout=10)
         if resp.status_code // 100 != 2:
             logger.warning(f"Discord Webhook a renvoyé {resp.status_code} : {resp.text}")
         else:
@@ -173,9 +173,9 @@ def main():
     logger.info("--- Démarrage de la surveillance Okkazeo ---")
 
     # Nouvelle vérification pour debug
-    if not WEBHOOK_DISCORD_OKKAZEO:
+    if not DISCORD_WEBHOOK_OKKAZEO:
         # Ceci sera imprimé si la variable est vide
-        logger.error("Arrêt : Le Secret WEBHOOK_DISCORD_OKKAZEO n'est pas chargé (valeur vide).")
+        logger.error("Arrêt : Le Secret DISCORD_WEBHOOK_OKKAZEO n'est pas chargé (valeur vide).")
         return
 
     # Si nous arrivons ici, la variable a été lue.
