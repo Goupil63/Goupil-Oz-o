@@ -3,19 +3,50 @@ import json
 from bs4 import BeautifulSoup
 import os
 
-# --- Configurations ---
+
+# ----------------------
+# 1. CONFIGURATION
+# ----------------------
+
 # URL de la page Les Demeures de l'Épouvante (2nde Édition)
 URL_OKKAZE = "https://www.okkazeo.com/jeux/41095/les-demeures-de-l-epouvante-mansions-of-madness-2eme-edition"
+
 # Nom du fichier pour la mémoire des annonces vues
-FILE_SEEN = "seen.json"
+SEEN_FILE = "seen.json"
 
 # Récupération de l'URL du Webhook Discord depuis les variables d'environnement
 # (Doit être configuré en tant que "Secret" dans GitHub Actions pour la sécurité)
 WEBHOOK_DISCORD_OKKAZEO = os.environ.get("WEBHOOK_DISCORD_OKKAZEO") 
 
 
-# --- Fonctions de Gestion de Fichier ---
+# ----------------------
+# 2. LOGGING
+# ----------------------
+# Configuration de base pour l'affichage des logs
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("OkkazeoScraper") 
 
+
+# ----------------------
+# 3. SESSION HTTP
+# ----------------------
+# Utilisation d'une session pour réutiliser la connexion et les headers
+session = requests.Session()
+session.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+    # Mettre un Referer plus neutre/générique
+    "Referer": "https://www.google.com/", 
+    "Connection": "keep-alive",
+    "DNT": "1", 
+    "Upgrade-Insecure-Requests": "1",
+})
+
+
+# ----------------------
+# 4. MEMOIRE PERSISTANTE
+# ----------------------
 def load_seen_items(filename):
     """Charge les identifiants d'annonces déjà vues depuis le fichier JSON."""
     if os.path.exists(filename):
@@ -23,130 +54,134 @@ def load_seen_items(filename):
             with open(filename, 'r', encoding='utf-8') as f:
                 return set(json.load(f))
         except json.JSONDecodeError:
-            print(f"Avertissement : Le fichier {filename} est vide ou corrompu. Recommence à zéro.")
+            logger.warning(f"Le fichier {filename} est vide ou corrompu. Recommence à zéro.")
             return set()
     return set()
 
 def save_seen_items(filename, items_set):
     """Sauvegarde les identifiants d'annonces actuels dans le fichier JSON."""
     with open(filename, 'w', encoding='utf-8') as f:
-        # Convertir le set en liste pour l'écriture en JSON
         json.dump(list(items_set), f, indent=4)
 
 
+# ----------------------
+# 5. DISCORD
+# ----------------------
+
+    message = {"content": message_content}
+    try:
+        requests.post(status_webhook_url, json=message, timeout=10)
+        logger.info("Message de statut envoyé avec succès.")
+    except Exception as e:
+        logger.error(f"Erreur lors de l'envoi du message de statut : {e}")
+
+
+
+def send_to_discord(title, price, link, img_url=""):
+    if not title or not link:
+        logger.warning("Titre ou lien vide, notification Discord ignorée")
+        return
+    data = {
+        "embeds": [{
+            "title": f"{title} - {price}",
+            "url": link,
+            "color": 3447003,
+            "image": {"url": img_url} if img_url else None
+        }]
+    }
+    try:
+        resp = session.post(WEBHOOK_DISCORD_OKKAZEO, json=data, timeout=10)
+        if resp.status_code // 100 != 2:
+            logger.warning(f"Discord Webhook renvoyé {resp.status_code}")
+    except Exception as e:
+        logger.error(f"Erreur en envoyant à Discord : {e}")
+
+
+# 6. SCRAPING
 # --- Fonctions de Scraping et d'Alerte ---
 
 def fetch_and_parse(url):
     """Récupère la page et extrait les informations des annonces en ciblant div.box_article."""
     try:
-        # Utilisation d'un User-Agent pour se faire passer pour un navigateur
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers)
-        response.raise_for_status() # Lève une exception pour les erreurs HTTP
+        response = session.get(url)
+        response.raise_for_status() 
     except requests.exceptions.RequestException as e:
-        print(f"Erreur de requête HTTP : {e}")
+        logger.error(f"Erreur de requête HTTP : {e}")
         return []
 
     soup = BeautifulSoup(response.text, 'html.parser')
     announcements = []
 
-    # Cible : la div principale de chaque annonce ('grid-x box_article')
     for element in soup.select('div.box_article'):
         
-        # --- 1. ID et Lien ---
-        link_tag = element.select_one('a') # Premier lien englobant
+        # 1. ID et Lien
+        link_tag = element.select_one('a')
         if not link_tag or 'href' not in link_tag.attrs:
              continue 
 
         item_path = link_tag['href']
-        
-        # Extrait l'ID numérique (ex: 1307762)
         try:
              item_id = item_path.split('/')[2]
         except (IndexError, AttributeError):
              continue
+        
+        full_url = f"https://www.okkazeo.com{item_path}"
 
-        # --- 2. Prix ---
-        # Le prix est dans la balise span.prix (dans la colonne du milieu ou de droite)
+        # 2. Prix
         price_tag = element.select_one('span.prix') 
         price = price_tag.text.strip() if price_tag else "Prix non spécifié"
         
-        # --- 3. Vendeur ---
+        # 3. Vendeur et Lieu
         seller_tag = element.select_one('a[title^="Voir le profil"]')
         seller_name = seller_tag.text.strip() if seller_tag else "Vendeur non spécifié"
         
-        # --- 4. Lieu ---
-        # On essaie de cibler le texte après l'icône de localisation
-        location = "Lieu non spécifié"
         location_element = element.find('i', class_='fa-map-marker-alt')
+        location = "Lieu non spécifié"
         if location_element:
-             # Le texte du lieu est le texte de la div parente
-             parent_div = location_element.parent
-             # Simplification de l'extraction : on prend le texte et on le nettoie
-             text_content = parent_div.get_text(strip=True, separator=' ')
-             # Le lieu est souvent juste avant <br> ou après le drapeau
-             # Cette approche nécessite souvent des ajustements manuels mais c'est un bon début:
-             try:
-                 location = text_content.split(')')[1].split('<br>')[0].strip()
-             except IndexError:
-                 # Si l'extraction échoue, on prend le texte brut
-                 location = text_content 
+             # On cherche le nœud de texte après le drapeau
+             drapeau = element.find('img', class_='drapeau')
+             if drapeau and drapeau.next_sibling:
+                 # Le lieu est souvent le nœud de texte suivant, nettoyé
+                 location = drapeau.next_sibling.strip().split('<br>')[0].strip()
 
+        seller_location = f"{seller_name} ({location})"
+
+        # 5. Image (optionnel)
+        img_tag = element.select_one('img.mts.mbs')
+        img_src = img_tag['src'] if img_tag else ""
+        if img_src and not img_src.startswith('http'):
+            img_src = f"https://www.okkazeo.com{img_src}"
         
         announcements.append({
             'id': item_id,
-            'title': f"Annonce par {seller_name} à {location}",
+            'title': f"Vente Les Demeures de l'Épouvante", 
             'price': price,
-            'url': f"https://www.okkazeo.com{item_path}" 
+            'url': full_url,
+            'seller_location': seller_location, # Nouvelle clé
+            'img_url': img_src
         })
     
     return announcements
 
-def send_discord_alert(item):
-    """Envoie un message formaté via le Webhook Discord."""
-    if not WEBHOOK_DISCORD_OKKAZEO:
-        print("Erreur : WEBHOOK_DISCORD_OKKAZEO n'est pas configuré. Impossible d'envoyer l'alerte.")
-        return
-
-    print(f"Alerte : Nouvelle annonce détectée : {item['title']} - {item['price']}")
-
-    data = {
-        # Ping spécifique pour attirer l'attention
-        "content": "@here 🚨 Nouvelle Annonce Les Demeures de l'Épouvante !", 
-        "embeds": [
-            {
-                "title": item['title'], # Ex: Annonce par Ronywan à Paris (75015)
-                "url": item['url'],
-                "description": f"**Prix :** {item['price']}\n[Cliquez pour voir l'annonce]({item['url']})",
-                "color": 16752384 # Couleur orange pour l'alerte
-            }
-        ]
-    }
-
-    try:
-        response = requests.post(WEBHOOK_DISCORD_OKKAZEO, json=data)
-        response.raise_for_status()
-        print("Alerte Discord envoyée avec succès.")
-    except requests.exceptions.RequestException as e:
-        print(f"Erreur lors de l'envoi à Discord : {e}")
 
 
-# --- Fonction Principale ---
+# ----------------------
+# 7. FONCTION PRINCIPALE
+# ----------------------
 
 def main():
     """Fonction principale pour exécuter la surveillance."""
-    print("--- Démarrage de la surveillance Okkazeo ---")
+    logger.info("--- Démarrage de la surveillance Okkazeo ---")
     
     # 1. Charger les identifiants déjà vus
-    seen_ids = load_seen_items(FILE_SEEN)
-    print(f"Annonces déjà vues : {len(seen_ids)}")
+    seen_ids = load_seen_items(SEEN_FILE)
+    logger.info(f"Annonces déjà vues : {len(seen_ids)}")
     
     # 2. Scraper les annonces actuelles
     current_announcements = fetch_and_parse(URL_OKKAZE)
     
     if not current_announcements:
-        print("Aucune annonce trouvée ou erreur de scraping.")
-        # S'il y a une erreur de scraping, on ne touche pas à seen.json
+        logger.warning("Aucune annonce trouvée ou erreur de scraping.")
         return
 
     new_ids = set()
@@ -154,25 +189,33 @@ def main():
 
     # 3. Identifier les nouvelles annonces
     for item in current_announcements:
-        # Ajoute tous les IDs actuels à new_ids pour la sauvegarde
         new_ids.add(item['id'])
         
-        # Vérifie la nouveauté
         if item['id'] not in seen_ids:
             new_announcements.append(item)
 
     # 4. Traiter et alerter les nouvelles annonces
     if new_announcements:
-        print(f"!!! {len(new_announcements)} NOUVELLE(S) ANNONCE(S) DÉTECTÉE(S) !!!")
+        logger.info(f"!!! {len(new_announcements)} NOUVELLE(S) ANNONCE(S) DÉTECTÉE(S) !!!")
         for item in new_announcements:
-            send_discord_alert(item)
+            # ❌ CORRECTION : Appel avec les nouvelles clés et la bonne fonction
+            send_to_discord(
+                item['title'], 
+                item['price'], 
+                item['url'], 
+                item['seller_location'],
+                item['img_url']
+            )
     else:
-        print("Aucune nouvelle annonce détectée.")
+        logger.info("Aucune nouvelle annonce détectée.")
 
     # 5. Mettre à jour le fichier de mémoire
-    save_seen_items(FILE_SEEN, new_ids)
-    print("Fichier de mémoire mis à jour.")
-    print("--- Surveillance terminée ---")
+    save_seen_items(SEEN_FILE, new_ids)
+    logger.info("Fichier de mémoire mis à jour.")
+    logger.info("--- Surveillance terminée ---")
+
+if __name__ == "__main__":
+    main()
 
 if __name__ == "__main__":
     main()
