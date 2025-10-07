@@ -1,5 +1,9 @@
 name: Okkazeo Scraper Alert
 
+on:
+  # Permet le lancement manuel via l'interface GitHub (bouton "Run workflow")
+  workflow_dispatch:
+  
 jobs:
   scrape_and_alert:
     runs-on: ubuntu-latest
