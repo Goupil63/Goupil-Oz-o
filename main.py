@@ -66,8 +66,19 @@ def save_seen_items(filename, items_set):
 
 
 # ----------------------
+# 4.bis LECTURE URL
+# ----------------------
+
+def read_urls(filename):
+    """Lit une liste d'URLs depuis un fichier."""
+    urls = []
+    # ... le reste du code de la fonction ...
+    return urls
+
+# ----------------------
 # 5. DISCORD
 # ----------------------
+
 
 def send_to_discord(title, price, link, seller_location, img_url=""):
     if not title or not link:
