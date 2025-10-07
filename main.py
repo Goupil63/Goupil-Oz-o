@@ -171,6 +171,15 @@ def fetch_and_parse(url):
 def main():
     """Fonction principale pour exécuter la surveillance."""
     logger.info("--- Démarrage de la surveillance Okkazeo ---")
+
+    # Nouvelle vérification pour debug
+    if not WEBHOOK_DISCORD_OKKAZEO:
+        # Ceci sera imprimé si la variable est vide
+        logger.error("Arrêt : Le Secret WEBHOOK_DISCORD_OKKAZEO n'est pas chargé (valeur vide).")
+        return
+
+    # Si nous arrivons ici, la variable a été lue.
+    logger.info("Webhook Discord chargé avec succès.")
     
     # 1. Charger les identifiants déjà vus
     seen_ids = load_seen_items(SEEN_FILE)
