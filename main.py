@@ -96,6 +96,8 @@ def send_to_discord(title, price, link, seller_location, img_url=""):
         logger.error(f"Erreur en envoyant à Discord : {e}")
 
 
+
+
 # 6. SCRAPING
 # --- Fonctions de Scraping et d'Alerte ---
 
@@ -184,43 +186,56 @@ def main():
     # 1. Charger les identifiants déjà vus
     seen_ids = load_seen_items(SEEN_FILE)
     logger.info(f"Annonces déjà vues : {len(seen_ids)}")
+
     
-    # 2. Scraper les annonces actuelles
-    current_announcements = fetch_and_parse(URL_OKKAZE)
-    
-    if not current_announcements:
-        logger.warning("Aucune annonce trouvée ou erreur de scraping.")
+    # 2. Lire les URLs à surveiller
+    target_urls = read_urls(URLS_FILE)
+    if not target_urls:
+        logger.warning("Aucune URL trouvée dans le fichier urls.txt. Arrêt.")
         return
 
+    # Nouvelle liste d'IDs vus après cette exécution
     new_ids = set()
-    new_announcements = []
+    total_new_announcements = 0
 
-    # 3. Identifier les nouvelles annonces
-    for item in current_announcements:
-        new_ids.add(item['id'])
+    # 3. ITÉRER SUR TOUTES LES URLS
+    for url in target_urls:
+        logger.info(f"Scraping de l'URL : {url}")
         
-        if item['id'] not in seen_ids:
-            new_announcements.append(item)
+        current_announcements = fetch_and_parse(url)
+        
+        if not current_announcements:
+            logger.warning(f"Aucune annonce trouvée pour {url} ou erreur de scraping.")
+            continue
 
-    # 4. Traiter et alerter les nouvelles annonces
-    if new_announcements:
-        logger.info(f"🚨 {len(new_announcements)} nouvelle(s) annonce(s) détectée(s) !")
-        for item in new_announcements:
-            send_to_discord(
-                item['title'],
-                item['price'],
-                item['url'],
-                item['seller_location'],
-                item['img_url']
-            )
+        # 4. Identifier les nouvelles annonces pour cette URL
+        for item in current_announcements:
+            new_ids.add(item['id'])
             
-    else:
-        logger.info("Aucune nouvelle annonce détectée.")
+            if item['id'] not in seen_ids:
+                total_new_announcements += 1
+                
+                # Envoi immédiat de l'alerte
+                send_to_discord(
+                    item['title'], 
+                    item['price'], 
+                    item['url'], 
+                    item['seller_location'],
+                    item['img_url']
+                )
 
-    # 5. Mettre à jour le fichier de mémoire
+    # 5. Résultat global et mise à jour de la mémoire
+    if total_new_announcements > 0:
+        logger.info(f"!!! TOTAL : {total_new_announcements} NOUVELLE(S) ANNONCE(S) ENVOYÉE(S) !!!")
+    else:
+        logger.info("Aucune nouvelle annonce détectée sur toutes les URL.")
+
+    # 6. Mettre à jour le fichier de mémoire
     save_seen_items(SEEN_FILE, new_ids)
     logger.info("Fichier de mémoire mis à jour.")
     logger.info("--- Surveillance terminée ---")
 
 if __name__ == "__main__":
     main()
+
+
