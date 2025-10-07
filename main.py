@@ -15,6 +15,9 @@ URL_OKKAZE = "https://www.okkazeo.com/jeux/41095/les-demeures-de-l-epouvante-man
 # Nom du fichier pour la mémoire des annonces vues
 SEEN_FILE = "seen.json"
 
+# Définition du fichier contenant les listes d'URLs
+URLS_FILE = "urls.txt" 
+
 # Récupération de l'URL du Webhook Discord depuis les variables d'environnement
 # (Doit être configuré en tant que "Secret" dans GitHub Actions pour la sécurité)
 DISCORD_WEBHOOK_OKKAZEO = os.environ.get("DISCORD_WEBHOOK_OKKAZEO") 
