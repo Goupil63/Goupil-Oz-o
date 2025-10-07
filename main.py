@@ -12,7 +12,7 @@ with open(CONFIG_FILE, "r") as f:
     config = json.load(f)
 
 OKKAZEO_URL = config["okkazeo_url"]
-DISCORD_WEBHOOK = config["discord_webhook"]
+DISCORD_WEBHOOK_OKKAZEO = config["discord_webhook"]
 POLL_INTERVAL = config.get("poll_interval", 300)
 
 # --- Charger les annonces déjà vues ---
