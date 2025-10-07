@@ -195,39 +195,26 @@ def fetch_and_parse(url):
 
 
 # ----------------------
-# 7. FONCTION PRINCIPALE
+# 7. LOGIQUE DE SURVEILLANCE
+# ----------------------
+# ----------------------
+# 7. LOGIQUE DE SURVEILLANCE (appelée par la boucle)
 # ----------------------
 def check_okkazeo():
-    """Fonction principale pour exécuter une seule surveillance (anciennement main)."""
-    logger.info("--- Démarrage de la surveillance Okkazeo ---")
-
+    """Fonction pour exécuter une seule passe complète de surveillance multi-URL."""
+    
+    # 1. Vérification du Webhook
     if not DISCORD_WEBHOOK_OKKAZEO:
         logger.error("Arrêt : Le Secret DISCORD_WEBHOOK_OKKAZEO n'est pas chargé (valeur vide).")
         return
 
-    # Si nous arrivons ici, la variable a été lue.
-    logger.info("Webhook Discord chargé avec succès.")
-
-
-def main():
-    """Fonction principale pour exécuter la surveillance."""
-    logger.info("--- Démarrage de la surveillance Okkazeo ---")
-
-    # Nouvelle vérification pour debug
-    if not DISCORD_WEBHOOK_OKKAZEO:
-        # Ceci sera imprimé si la variable est vide
-        logger.error("Arrêt : Le Secret DISCORD_WEBHOOK_OKKAZEO n'est pas chargé (valeur vide).")
-        return
-
-    # Si nous arrivons ici, la variable a été lue.
     logger.info("Webhook Discord chargé avec succès.")
     
-    # 1. Charger les identifiants déjà vus
+    # 2. Charger les identifiants déjà vus
     seen_ids = load_seen_items(SEEN_FILE)
     logger.info(f"Annonces déjà vues : {len(seen_ids)}")
-
     
-    # 2. Lire les URLs à surveiller
+    # 3. Lire les URLs à surveiller
     target_urls = read_urls(URLS_FILE)
     if not target_urls:
         logger.warning("Aucune URL trouvée dans le fichier urls.txt. Arrêt.")
@@ -237,7 +224,7 @@ def main():
     new_ids = set()
     total_new_announcements = 0
 
-    # 3. ITÉRER SUR TOUTES LES URLS
+    # 4. ITÉRER SUR TOUTES LES URLS
     for url in target_urls:
         logger.info(f"Scraping de l'URL : {url}")
         
@@ -247,9 +234,10 @@ def main():
             logger.warning(f"Aucune annonce trouvée pour {url} ou erreur de scraping.")
             continue
 
-        # 4. Identifier les nouvelles annonces pour cette URL
+        # 5. Identifier les nouvelles annonces pour cette URL
         for item in current_announcements:
-            new_ids.add(item['id'])
+            # On ajoute toujours l'ID au set des annonces vues pour cette passe
+            new_ids.add(item['id']) 
             
             if item['id'] not in seen_ids:
                 total_new_announcements += 1
@@ -263,48 +251,34 @@ def main():
                     item['img_url']
                 )
 
-    # 5. Résultat global et mise à jour de la mémoire
+    # 6. Résultat global et mise à jour de la mémoire
     if total_new_announcements > 0:
         logger.info(f"!!! TOTAL : {total_new_announcements} NOUVELLE(S) ANNONCE(S) ENVOYÉE(S) !!!")
     else:
         logger.info("Aucune nouvelle annonce détectée sur toutes les URL.")
 
-    # 6. Mettre à jour le fichier de mémoire
+    # 7. Mettre à jour le fichier de mémoire
+    # NOTE : La sauvegarde doit se faire avec les IDs que nous avons vus dans ce run (new_ids)
     save_seen_items(SEEN_FILE, new_ids)
     logger.info("Fichier de mémoire mis à jour.")
-    logger.info("--- Surveillance terminée ---")
+    logger.info("--- Passe de surveillance terminée ---")
 
-if __name__ == "__main__":
-    main()
 
 
 # ----------------------
-# 7. BOUCLE BOT AVEC DUREE LIMITEE <-- Votre nouveau code
+# 8. BOUCLE BOT AVEC DUREE LIMITEE
 # ----------------------
 def bot_loop():
-    # Pour la gestion du seen_items, nous devons le charger une seule fois
-    seen_ids = load_seen_items(SEEN_FILE)
-    logger.info(f"Annonces initialement vues : {len(seen_ids)}")
+# ... (le code de bot_loop que vous avez est correct) ...
+    logger.info(f"⏰ Démarrage de la boucle pour {RUN_DURATION / 3600:.2f} heures.")
     
     end_time = time.time() + RUN_DURATION
     
     while time.time() < end_time:
         logger.info("▶️ Nouvelle analyse...")
         
-        # ❌ CORRECTION : Appelle la fonction de scraping Okkazeo
-        # Vous devrez adapter check_okkazeo pour qu'elle prenne et mette à jour seen_ids.
-        # Pour une solution simple, nous allons la laisser charger/sauvegarder à chaque fois, 
-        # mais c'est moins efficace.
-
-        # *** Solution SIMPLE (recommandée ici) : Laisser check_okkazeo faire son travail
-        # et recharger la mémoire à chaque fois.
-        
-        check_okkazeo() # Appel de l'ancienne fonction main
-        
-        # *** Solution AVANCÉE (nécessite une refonte des arguments de check_okkazeo) ***
-        # new_ids = check_okkazeo(seen_ids)
-        # seen_ids = new_ids 
-
+        # L'appel au scraping unique
+        check_okkazeo() # L'appel est maintenant propre et contient toute la logique
         
         time_remaining = end_time - time.time()
         if time_remaining <= 0:
@@ -317,17 +291,11 @@ def bot_loop():
         logger.info(f"🔍 Prochaine analyse dans {int(sleep_time)} secondes")
         time.sleep(sleep_time)
 
-    logger.info("🏁 Fin du run")
-    # Si nous gardons la structure check_okkazeo qui sauvegarde à la fin, nous n'avons pas besoin
-    # de cette ligne : save_seen(seen_items) 
-    # send_status_message("✅ Run terminé !") # Nécessite l'implémentation de cette fonction
+    logger.info("🏁 Fin du run complet.")
 
-# ----------------------
-# 8. POINT D'ENTRÉE (Mis à jour)
-# ----------------------
+
 if __name__ == "__main__":
-    # ❌ CORRECTION : Appelle la nouvelle boucle principale
+    # Point d'entrée unique et correct
     bot_loop()
-
 
 
